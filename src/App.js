@@ -1,69 +1,80 @@
-import React, { PureComponent } from 'react';
+import React, { useState } from 'react';
+
 import ReactCrop from 'react-image-crop';
+import smartcrop from 'smartcrop';
+
 import 'react-image-crop/dist/ReactCrop.css';
 
 import './App.css';
 
-class App extends PureComponent {
-  state = {
-    src: null,
-    crop: {
-      unit: '%',
-      width: 100,
-      aspect: 16 / 9,
-    },
-  };
+const App = () => {
+  // const [src, setSrc] = useState({ aspect: 5 / 5 });
+  const [src, setSrc] = useState(null);
+  const [crop, setCrop] = useState({});
+  const [croppedImageUrl, setCroppedImageUrl] = useState();
+  let imageRef = React.useRef();
+  let fileUrl  = null;
 
-  onSelectFile = e => {
+  const onSelectFile = e => {
     if (e.target.files && e.target.files.length > 0) {
       const reader = new FileReader();
       reader.addEventListener('load', () =>
-        this.setState({ src: reader.result })
+        setSrc(reader.result)
       );
       reader.readAsDataURL(e.target.files[0]);
     }
-  };
+  }
 
   // If you setState the crop in here you should return false.
-  onImageLoaded = image => {
-    this.imageRef = image;
+  const onImageLoaded = image => {
+    imageRef.current = image;
+    setSmartCrop(image);
+    return false;
   };
 
-  onCropComplete = crop => {
-    this.makeClientCrop(crop);
+  const onCropComplete = crop => {
+    console.log('on crop complete');
+    makeClientCrop(crop);
   };
 
-  onCropChange = (crop, percentCrop) => {
-    // You could also use percentCrop:
-    // this.setState({ crop: percentCrop });
-    this.setState({ crop });
+  const onCropChange = (crop, percentCrop) => {
+    console.log('on crop change', crop, percentCrop);
+    setCrop(crop);
   };
 
-  async makeClientCrop(crop) {
-    if (this.imageRef && crop.width && crop.height) {
-      const croppedImageUrl = await this.getCroppedImg(
-        this.imageRef,
+  const makeClientCrop = async (crop) => {
+    if (imageRef.current && crop.width && crop.height) {
+      const croppedImageUrl = await getCroppedImg(
         crop,
         'newFile.jpeg'
       );
-      this.setState({ croppedImageUrl });
+      setCroppedImageUrl(croppedImageUrl);
     }
   }
 
-  getCroppedImg(image, crop, fileName) {
+  const setSmartCrop = () => {
+    smartcrop.crop(imageRef.current, { width: 7, height: 5 }).then(
+      (crop) => {
+        console.log(crop)
+        // const newCrop = { height: crop.topCrop }
+        setCrop(crop.topCrop);
+        makeClientCrop(crop.topCrop);
+      }
+    );
+  }
+
+  const getCroppedImg = (crop, fileName) => {
     const canvas = document.createElement('canvas');
-    const scaleX = image.naturalWidth / image.width;
-    const scaleY = image.naturalHeight / image.height;
     canvas.width = crop.width;
     canvas.height = crop.height;
     const ctx = canvas.getContext('2d');
 
     ctx.drawImage(
-      image,
-      crop.x * scaleX,
-      crop.y * scaleY,
-      crop.width * scaleX,
-      crop.height * scaleY,
+      imageRef.current,
+      crop.x,
+      crop.y,
+      crop.width,
+      crop.height,
       0,
       0,
       crop.width,
@@ -78,39 +89,42 @@ class App extends PureComponent {
           return;
         }
         blob.name = fileName;
-        window.URL.revokeObjectURL(this.fileUrl);
-        this.fileUrl = window.URL.createObjectURL(blob);
-        resolve(this.fileUrl);
+        window.URL.revokeObjectURL(fileUrl);
+        fileUrl = window.URL.createObjectURL(blob);
+        resolve(fileUrl);
       }, 'image/jpeg');
     });
   }
 
-  render() {
-    const { crop, croppedImageUrl, src } = this.state;
-
-    return (
-      <div className="App">
-        <div>
-          <input type="file" accept="image/*" onChange={this.onSelectFile} />
-        </div>
-        {src && (
-          <ReactCrop
-            src={src}
-            crop={crop}
-            ruleOfThirds
-            onImageLoaded={this.onImageLoaded}
-            onComplete={this.onCropComplete}
-            onChange={this.onCropChange}
-          />
-        )}
-        {croppedImageUrl && (
-          <img alt="Crop" style={{ maxWidth: '100%' }} src={croppedImageUrl} />
-        )}
+  return (
+    <div className="App">
+      <h1>FaceCrop</h1>
+      <div>
+        <input type="file" accept="image/*" onChange={onSelectFile} />
       </div>
-    );
-  }
+      <div className="Preview">
+        <div className="Original">
+          <h2>original</h2>
+          {src && (
+            <ReactCrop
+              src={src}
+              crop={crop}
+              ruleOfThirds
+              onImageLoaded={onImageLoaded}
+              onComplete={onCropComplete}
+              onChange={onCropChange}
+            />
+          )}
+        </div>
+        <div className="FaceCrop">
+          <h2>after</h2>
+          {croppedImageUrl && (
+            <img alt="Crop" style={{ maxWidth: '100%' }} src={croppedImageUrl} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default App;
-
-// ReactDOM.render(<App />, document.getElementById('root'));
